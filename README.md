@@ -1,2 +1,2 @@
 # pip_android
-AndroidでPIP再生できる動画ビューア
+AndroidでPIP再生できる簡易的な動画ビューア
