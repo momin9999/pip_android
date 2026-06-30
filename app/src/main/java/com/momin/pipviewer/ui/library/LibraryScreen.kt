@@ -121,7 +121,7 @@ fun LibraryScreen(
                 contents = vm.contents,
                 loading = vm.loading,
                 starredKeys = starredKeys,
-                onBack = vm::goBack,
+                onBack = { vm.goBack() },
                 onOpenFolder = vm::openFolder,
                 onToggleStar = vm::setStarred,
                 onPlay = onPlay,

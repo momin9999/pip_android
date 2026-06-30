@@ -22,10 +22,12 @@ data class FolderRef(
     val childrenUri: Uri
         get() = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, documentId)
 
+    // treeUri / documentId never contain newlines; display names on Android can't either,
+    // so '\n' is a safe field separator for persistence.
     fun encode(): String = listOf(treeUri.toString(), documentId, name).joinToString(SEP)
 
     companion object {
-        private const val SEP = ""
+        private const val SEP = "\n"
 
         fun decode(value: String): FolderRef? {
             val parts = value.split(SEP)
