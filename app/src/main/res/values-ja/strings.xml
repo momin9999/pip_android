@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PIPビューア</string>
+
+    <!-- Library -->
+    <string name="library">ライブラリ</string>
+    <string name="favorites">お気に入り</string>
+    <string name="folders">フォルダ</string>
+    <string name="videos">ビデオ</string>
+    <string name="add_folder">フォルダを追加</string>
+    <string name="empty_title">フォルダがありません</string>
+    <string name="empty_subtitle">フォルダを追加して動画を再生しましょう。他のアプリから直接動画を開くこともできます。</string>
+    <string name="remove_from_library">ライブラリから削除</string>
+    <string name="star">お気に入りに追加</string>
+    <string name="unstar">お気に入りから削除</string>
+    <string name="folder_empty">動画がありません</string>
+    <string name="back">戻る</string>
+
+    <!-- Player -->
+    <string name="play">再生</string>
+    <string name="pause">一時停止</string>
+    <string name="close">閉じる</string>
+    <string name="lock">ロック</string>
+    <string name="unlock">ロック解除</string>
+    <string name="pip">ピクチャインピクチャ</string>
+    <string name="previous">前へ</string>
+    <string name="next">次へ</string>
+    <string name="rewind">10秒戻る</string>
+    <string name="fast_forward">10秒進む</string>
+    <string name="brightness_auto">自動</string>
+    <string name="cannot_open_video">この動画を開けませんでした</string>
+</resources>

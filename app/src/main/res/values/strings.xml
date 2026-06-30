@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PIP Viewer</string>
+
+    <!-- Library -->
+    <string name="library">Library</string>
+    <string name="favorites">Favorites</string>
+    <string name="folders">Folders</string>
+    <string name="videos">Videos</string>
+    <string name="add_folder">Add Folder</string>
+    <string name="empty_title">No Folders Yet</string>
+    <string name="empty_subtitle">Add a folder to browse and play your videos. You can also open videos straight from other apps.</string>
+    <string name="remove_from_library">Remove from Library</string>
+    <string name="star">Add to Favorites</string>
+    <string name="unstar">Remove from Favorites</string>
+    <string name="folder_empty">No videos here</string>
+    <string name="back">Back</string>
+
+    <!-- Player -->
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="close">Close</string>
+    <string name="lock">Lock</string>
+    <string name="unlock">Unlock</string>
+    <string name="pip">Picture in Picture</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+    <string name="rewind">Rewind 10 seconds</string>
+    <string name="fast_forward">Forward 10 seconds</string>
+    <string name="brightness_auto">Auto</string>
+    <string name="cannot_open_video">Couldn\'t open this video</string>
+</resources>

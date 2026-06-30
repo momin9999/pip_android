@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Play glyph, centered in the adaptive-icon safe zone -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M44,36 C44,33.4 46.8,31.8 49,33.1 L75.5,49.9 C77.6,51.2 77.6,54.8 75.5,56.1 L49,72.9 C46.8,74.2 44,72.6 44,70 Z" />
+</vector>
