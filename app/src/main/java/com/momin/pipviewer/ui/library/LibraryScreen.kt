@@ -149,9 +149,13 @@ private fun HomeScreen(
         return
     }
 
+    // stringResource() is @Composable, so resolve labels here — the grid content lambda is not.
+    val favoritesLabel = stringResource(R.string.favorites)
+    val foldersLabel = stringResource(R.string.folders)
+
     GridScaffold(title = stringResource(R.string.library)) {
         if (starred.isNotEmpty()) {
-            sectionHeader(stringResource(R.string.favorites))
+            sectionHeader(favoritesLabel)
             items(starred, key = { "fav_" + it.key }) { f ->
                 FolderCard(
                     name = f.name,
@@ -163,7 +167,7 @@ private fun HomeScreen(
             }
         }
 
-        sectionHeader(stringResource(R.string.folders))
+        sectionHeader(foldersLabel)
         items(roots, key = { "root_" + it.key }) { f ->
             FolderCard(
                 name = f.name,
@@ -247,6 +251,10 @@ private fun FolderScreen(
 ) {
     BackHandler(onBack = onBack)
 
+    // stringResource() is @Composable, so resolve labels here — the grid content lambda is not.
+    val foldersLabel = stringResource(R.string.folders)
+    val videosLabel = stringResource(R.string.videos)
+
     GridScaffold(
         title = folder.name,
         onBack = onBack,
@@ -285,7 +293,7 @@ private fun FolderScreen(
         }
 
         if (contents.folders.isNotEmpty()) {
-            sectionHeader(stringResource(R.string.folders))
+            sectionHeader(foldersLabel)
             items(contents.folders, key = { "f_" + it.key }) { f ->
                 FolderCard(
                     name = f.name,
@@ -297,7 +305,7 @@ private fun FolderScreen(
         }
 
         if (contents.videos.isNotEmpty()) {
-            sectionHeader(stringResource(R.string.videos))
+            sectionHeader(videosLabel)
             itemsIndexed(contents.videos, key = { _, v -> "v_" + v.uri }) { index, video ->
                 VideoTile(video = video, onClick = { onPlay(contents.videos, index) })
             }
