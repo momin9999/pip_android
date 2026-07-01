@@ -66,3 +66,9 @@ data class FolderContents(
         val EMPTY = FolderContents(emptyList(), emptyList())
     }
 }
+
+/** A starred folder together with its immediate contents, for the home-screen shelves. */
+data class FavoriteShelf(
+    val folder: FolderRef,
+    val contents: FolderContents,
+)

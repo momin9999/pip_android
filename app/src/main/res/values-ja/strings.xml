@@ -29,4 +29,11 @@
     <string name="fast_forward">10秒進む</string>
     <string name="brightness_auto">自動</string>
     <string name="cannot_open_video">この動画を開けませんでした</string>
+    <string name="playback_error">この動画を再生できませんでした</string>
+
+    <!-- Favorites shelf -->
+    <string name="see_all">すべて表示</string>
+    <plurals name="video_count">
+        <item quantity="other">動画%d本</item>
+    </plurals>
 </resources>

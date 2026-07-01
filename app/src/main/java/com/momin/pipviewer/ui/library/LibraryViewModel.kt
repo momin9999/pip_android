@@ -9,11 +9,14 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.momin.pipviewer.data.FavoriteShelf
 import com.momin.pipviewer.data.FolderContents
 import com.momin.pipviewer.data.FolderRef
 import com.momin.pipviewer.folderRepository
 import com.momin.pipviewer.mediaRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -25,6 +28,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     val roots = folders.roots.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val starred = folders.starred.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val starredKeys = folders.starredKeys.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    /**
+     * Each starred folder paired with its immediate children (sub-folders + videos), so the home
+     * screen can show what's inside a favorite without having to open it. Re-derives whenever the
+     * set of favorites changes; the directory query itself runs off the main thread.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val favoriteShelves = folders.starred
+        .mapLatest { list -> list.map { FavoriteShelf(it, media.listChildren(it)) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /** Current browse path. Empty == home. */
     val path: SnapshotStateList<FolderRef> = emptyList<FolderRef>().toMutableStateList()
