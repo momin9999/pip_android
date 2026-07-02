@@ -29,4 +29,12 @@
     <string name="fast_forward">Forward 10 seconds</string>
     <string name="brightness_auto">Auto</string>
     <string name="cannot_open_video">Couldn\'t open this video</string>
+    <string name="playback_error">Couldn\'t play this video</string>
+
+    <!-- Favorites shelf -->
+    <string name="see_all">See all</string>
+    <plurals name="video_count">
+        <item quantity="one">%d video</item>
+        <item quantity="other">%d videos</item>
+    </plurals>
 </resources>

@@ -30,16 +30,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.items as lazyRowItems
+import androidx.compose.foundation.lazy.itemsIndexed as lazyRowItemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -70,12 +74,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.momin.pipviewer.R
+import com.momin.pipviewer.data.FavoriteShelf
 import com.momin.pipviewer.data.FolderContents
 import com.momin.pipviewer.data.FolderRef
 import com.momin.pipviewer.data.VideoItem
@@ -94,6 +101,7 @@ fun LibraryScreen(
 ) {
     val roots by vm.roots.collectAsStateWithLifecycle()
     val starred by vm.starred.collectAsStateWithLifecycle()
+    val shelves by vm.favoriteShelves.collectAsStateWithLifecycle()
     val starredKeys by vm.starredKeys.collectAsStateWithLifecycle()
 
     val pickFolder = rememberLauncherForActivityResult(
@@ -108,12 +116,14 @@ fun LibraryScreen(
         if (folder == null) {
             HomeScreen(
                 roots = roots,
-                starred = starred,
+                shelves = shelves,
+                hasFavorites = starred.isNotEmpty(),
                 starredKeys = starredKeys,
                 onAddFolder = { pickFolder.launch(null) },
                 onOpenFolder = vm::openFolder,
                 onToggleStar = vm::setStarred,
                 onRemoveRoot = vm::removeRoot,
+                onPlay = onPlay,
             )
         } else {
             FolderScreen(
@@ -137,34 +147,33 @@ fun LibraryScreen(
 @Composable
 private fun HomeScreen(
     roots: List<FolderRef>,
-    starred: List<FolderRef>,
+    shelves: List<FavoriteShelf>,
+    hasFavorites: Boolean,
     starredKeys: Set<String>,
     onAddFolder: () -> Unit,
     onOpenFolder: (FolderRef) -> Unit,
     onToggleStar: (FolderRef, Boolean) -> Unit,
     onRemoveRoot: (FolderRef) -> Unit,
+    onPlay: (List<VideoItem>, Int) -> Unit,
 ) {
-    if (roots.isEmpty() && starred.isEmpty()) {
+    if (roots.isEmpty() && !hasFavorites) {
         EmptyLibrary(onAddFolder = onAddFolder)
         return
     }
 
     // stringResource() is @Composable, so resolve labels here — the grid content lambda is not.
-    val favoritesLabel = stringResource(R.string.favorites)
     val foldersLabel = stringResource(R.string.folders)
+    val emptyShelfLabel = stringResource(R.string.folder_empty)
 
     GridScaffold(title = stringResource(R.string.library)) {
-        if (starred.isNotEmpty()) {
-            sectionHeader(favoritesLabel)
-            items(starred, key = { "fav_" + it.key }) { f ->
-                FolderCard(
-                    name = f.name,
-                    starred = true,
-                    accent = StarYellow,
-                    onClick = { onOpenFolder(f) },
-                    onToggleStar = { onToggleStar(f, it) },
-                )
-            }
+        shelves.forEach { shelf ->
+            favoriteShelf(
+                shelf = shelf,
+                emptyLabel = emptyShelfLabel,
+                onOpenFolder = onOpenFolder,
+                onToggleStar = onToggleStar,
+                onPlay = onPlay,
+            )
         }
 
         sectionHeader(foldersLabel)
@@ -178,6 +187,157 @@ private fun HomeScreen(
             )
         }
         item(key = "add_folder") { AddFolderCard(onClick = onAddFolder) }
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/* Favorites shelves — a starred folder's inner folders + videos shown together on the home page  */
+/* --------------------------------------------------------------------------------------------- */
+
+private val SHELF_ITEM_WIDTH = 188.dp
+
+private fun LazyGridScope.favoriteShelf(
+    shelf: FavoriteShelf,
+    emptyLabel: String,
+    onOpenFolder: (FolderRef) -> Unit,
+    onToggleStar: (FolderRef, Boolean) -> Unit,
+    onPlay: (List<VideoItem>, Int) -> Unit,
+) {
+    item(key = "shelf_head_" + shelf.folder.key, span = { GridItemSpan(maxLineSpan) }) {
+        ShelfHeader(
+            folder = shelf.folder,
+            videoCount = shelf.contents.videos.size,
+            onOpen = { onOpenFolder(shelf.folder) },
+            onUnstar = { onToggleStar(shelf.folder, false) },
+        )
+    }
+    item(key = "shelf_row_" + shelf.folder.key, span = { GridItemSpan(maxLineSpan) }) {
+        if (shelf.contents.isEmpty) {
+            Text(
+                text = emptyLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp, top = 2.dp, bottom = 10.dp),
+            )
+        } else {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp),
+            ) {
+                lazyRowItems(shelf.contents.folders, key = { "sf_" + it.key }) { f ->
+                    ShelfFolderCard(name = f.name, onClick = { onOpenFolder(f) })
+                }
+                lazyRowItemsIndexed(shelf.contents.videos, key = { _, v -> "sv_" + v.uri }) { index, video ->
+                    ShelfVideoCard(video = video, onClick = { onPlay(shelf.contents.videos, index) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShelfHeader(
+    folder: FolderRef,
+    videoCount: Int,
+    onOpen: () -> Unit,
+    onUnstar: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onOpen)
+            .padding(start = 4.dp, end = 4.dp, top = 22.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LeadingSquare(tint = StarYellow, size = 36.dp) {
+            Icon(Icons.Rounded.Folder, contentDescription = null, tint = StarYellow, modifier = Modifier.size(21.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = folder.name,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (videoCount > 0) {
+                Text(
+                    text = pluralStringResource(R.plurals.video_count, videoCount, videoCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Icon(
+            Icons.Rounded.ChevronRight,
+            contentDescription = stringResource(R.string.see_all),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(24.dp),
+        )
+        StarToggle(starred = true, onToggle = { onUnstar() })
+    }
+}
+
+@Composable
+private fun ShelfVideoCard(video: VideoItem, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(SHELF_ITEM_WIDTH)
+            .clip(CARD_SHAPE)
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick),
+    ) {
+        VideoThumbnailBox(
+            video = video,
+            iconSize = 30.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f),
+        )
+        Text(
+            text = video.name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 12.dp),
+        )
+    }
+}
+
+@Composable
+private fun ShelfFolderCard(name: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(SHELF_ITEM_WIDTH)
+            .clip(CARD_SHAPE)
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.Folder,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(38.dp),
+            )
+        }
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 8.dp, bottom = 12.dp),
+        )
     }
 }
 
@@ -470,7 +630,6 @@ private fun AddFolderCard(onClick: () -> Unit) {
 
 @Composable
 private fun VideoTile(video: VideoItem, onClick: () -> Unit) {
-    val thumb = rememberVideoThumbnail(video.uri)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -478,59 +637,13 @@ private fun VideoTile(video: VideoItem, onClick: () -> Unit) {
             .background(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick),
     ) {
-        Box(
+        VideoThumbnailBox(
+            video = video,
+            iconSize = 34.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            val bmp = thumb?.bitmap
-            if (bmp != null) {
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Icon(
-                    Icons.Rounded.Movie,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(34.dp),
-                )
-            }
-            // soft play affordance
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(23.dp))
-                    .background(Color.Black.copy(alpha = 0.32f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.PlayArrow,
-                    contentDescription = stringResource(R.string.play),
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp),
-                )
-            }
-            val dur = thumb?.durationMs ?: 0L
-            if (dur > 0L) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                ) {
-                    Text(formatDuration(dur), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                }
-            }
-        }
+                .aspectRatio(16f / 9f),
+        )
         Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp)) {
             Text(
                 video.name,
@@ -545,6 +658,62 @@ private fun VideoTile(video: VideoItem, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** Shared 16:9 cover box: thumbnail (or placeholder), a soft play affordance, and a duration badge. */
+@Composable
+private fun VideoThumbnailBox(video: VideoItem, iconSize: Dp, modifier: Modifier) {
+    val thumb = rememberVideoThumbnail(video.uri)
+    Box(
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        val bmp = thumb?.bitmap
+        if (bmp != null) {
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                Icons.Rounded.Movie,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(iconSize),
+            )
+        }
+        // soft play affordance
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(46.dp)
+                .clip(RoundedCornerShape(23.dp))
+                .background(Color.Black.copy(alpha = 0.32f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.PlayArrow,
+                contentDescription = stringResource(R.string.play),
+                tint = Color.White,
+                modifier = Modifier.size(26.dp),
+            )
+        }
+        val dur = thumb?.durationMs ?: 0L
+        if (dur > 0L) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            ) {
+                Text(formatDuration(dur), style = MaterialTheme.typography.labelSmall, color = Color.White)
+            }
         }
     }
 }

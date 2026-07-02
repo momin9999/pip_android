@@ -6,9 +6,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioManager
+import android.provider.Settings
 import android.view.Window
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -88,6 +90,16 @@ import kotlin.math.roundToInt
 
 private enum class Indicator { NONE, BRIGHTNESS, VOLUME }
 
+/** Which vertical-drag control a gesture is bound to, decided by where it starts. */
+private enum class DragZone { NONE, BRIGHTNESS, VOLUME }
+
+/**
+ * Fraction of the width, on each side, that reacts to brightness/volume drags. The middle band
+ * in between is intentionally inert so the system "swipe up to go home" gesture (and other
+ * centre swipes) never change brightness or volume.
+ */
+private const val SIDE_ZONE_FRACTION = 0.35f
+
 @Composable
 fun PlayerScreen(
     player: ExoPlayer?,
@@ -155,7 +167,7 @@ private fun PlayerControls(
     var lockHint by remember { mutableStateOf(false) }
     var lockNonce by remember { mutableIntStateOf(0) }
 
-    var brightness by remember { mutableFloatStateOf(initialBrightness(window)) }
+    var brightness by remember { mutableFloatStateOf(initialBrightness(window, context)) }
     var volume by remember { mutableFloatStateOf(audioManager.volumeFraction(maxVolume)) }
 
     var indicator by remember { mutableStateOf(Indicator.NONE) }
@@ -224,6 +236,13 @@ private fun PlayerControls(
         }
     }
 
+    // While locked, swallow the back gesture and just re-show the unlock hint so an
+    // accidental back press can't dismiss the player.
+    BackHandler(enabled = locked) {
+        lockHint = true
+        lockNonce++
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
 
     // Gesture layer (bottom-most): tap, double-tap seek, vertical drags for brightness/volume.
@@ -257,28 +276,39 @@ private fun PlayerControls(
             }
             .pointerInput(locked) {
                 if (locked) return@pointerInput
-                var onLeft = true
+                // Left third controls brightness, right third controls volume, and the
+                // middle band is inert so the home-swipe gesture doesn't move either.
+                var zone = DragZone.NONE
                 detectVerticalDragGestures(
-                    onDragStart = { offset -> onLeft = offset.x < size.width / 2f },
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        val delta = -dragAmount / size.height.toFloat().coerceAtLeast(1f)
-                        if (onLeft) {
-                            brightness = (brightness + delta).coerceIn(0f, 1f)
-                            applyBrightness(window, brightness)
-                            indicator = Indicator.BRIGHTNESS
-                            indicatorLevel = brightness
-                        } else {
-                            volume = (volume + delta).coerceIn(0f, 1f)
-                            audioManager.setStreamVolume(
-                                AudioManager.STREAM_MUSIC,
-                                (volume * maxVolume).roundToInt(),
-                                0,
-                            )
-                            indicator = Indicator.VOLUME
-                            indicatorLevel = volume
+                    onDragStart = { offset ->
+                        val w = size.width.toFloat().coerceAtLeast(1f)
+                        zone = when {
+                            offset.x < w * SIDE_ZONE_FRACTION -> DragZone.BRIGHTNESS
+                            offset.x > w * (1f - SIDE_ZONE_FRACTION) -> DragZone.VOLUME
+                            else -> DragZone.NONE
                         }
-                        indicatorNonce++
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        if (zone != DragZone.NONE) {
+                            change.consume()
+                            val delta = -dragAmount / size.height.toFloat().coerceAtLeast(1f)
+                            if (zone == DragZone.BRIGHTNESS) {
+                                brightness = (brightness + delta).coerceIn(0f, 1f)
+                                applyBrightness(window, brightness)
+                                indicator = Indicator.BRIGHTNESS
+                                indicatorLevel = brightness
+                            } else {
+                                volume = (volume + delta).coerceIn(0f, 1f)
+                                audioManager.setStreamVolume(
+                                    AudioManager.STREAM_MUSIC,
+                                    (volume * maxVolume).roundToInt(),
+                                    0,
+                                )
+                                indicator = Indicator.VOLUME
+                                indicatorLevel = volume
+                            }
+                            indicatorNonce++
+                        }
                     },
                 )
             },
@@ -574,9 +604,14 @@ private fun Context.findActivity(): Activity? {
     return null
 }
 
-private fun initialBrightness(window: Window?): Float {
+private fun initialBrightness(window: Window?, context: Context): Float {
     val sb = window?.attributes?.screenBrightness ?: -1f
-    return if (sb in 0f..1f) sb else 0f
+    if (sb in 0f..1f) return sb
+    // No per-window override yet — seed from the current system brightness so the
+    // first upward swipe continues from the real level instead of jumping from 0.
+    return runCatching {
+        Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS) / 255f
+    }.getOrDefault(0.5f).coerceIn(0f, 1f)
 }
 
 private fun applyBrightness(window: Window?, fraction: Float) {

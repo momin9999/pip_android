@@ -29,6 +29,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
@@ -57,6 +58,18 @@ class PlayerActivity : ComponentActivity() {
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             updatePipParams()
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            // A single broken/unsupported file shouldn't freeze the whole playlist:
+            // skip to the next item when possible, otherwise tell the user.
+            val exo = player ?: return
+            if (exo.hasNextMediaItem()) {
+                exo.seekToNextMediaItem()
+                exo.prepare()
+            } else {
+                Toast.makeText(this@PlayerActivity, R.string.playback_error, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -119,7 +132,13 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        releasePlayer()
+        // While a PIP window is still on screen (e.g. the user opened another app)
+        // the activity is stopped but the PIP surface keeps rendering, so we must
+        // keep the player alive — otherwise playback would blank out / the PIP
+        // would close. A truly finishing activity is torn down in onDestroy().
+        if (!isInPictureInPictureMode) {
+            releasePlayer()
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -156,6 +175,7 @@ class PlayerActivity : ComponentActivity() {
         val exo = ExoPlayer.Builder(this)
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
+            .setHandleAudioBecomingNoisy(true)
             .build()
         exo.setAudioAttributes(
             AudioAttributes.Builder()
